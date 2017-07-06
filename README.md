@@ -15,7 +15,7 @@ The code has been built and tested using the following packages (and versions)
 
 Make sure you have a running tensorflow setup.
 
-We added some special flags to have a better overview of the different experiments. One thing we added is a so called `folder_suffix` which will be appended to all checkpoint, log and samples folders. 
+We added some special flags to have a better overview of the different experiments. One thing we added is a `folder_suffix` which will be appended to all checkpoint, log and samples folders. 
 
 Here are some examples to train the ABC-GAN with datasets:
 
@@ -24,17 +24,40 @@ Here are some examples to train the ABC-GAN with datasets:
 
 
 
+
+
 ### Datasets
 
 The following datasets have been used:
 
-* CelebA (> 200'000 celebrity faces, 178 px lower side)
-* Cifar10 (60'000 pictures of 10 categories, 32x32 px)
-* LSUN (> 3 Mio images of bedrooms 256 px lower side)
+* [CelebA](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) (> 200'000 celebrity faces, 178 px lower side)
+* [Cifar10](https://www.cs.toronto.edu/~kriz/cifar.html) (60'000 pictures of 10 categories, 32x32 px)
+* [LSUN](http://www.yf.io/p/lsun) (> 3 Mio images of bedrooms 256 px lower side)
+* [ImageNet subset](http://image-net.org/small/download.php) (ImageNet subset, 64 by 64 pixels)
 
 The easiest way to include the datasets is by having all images in one folder.
 Using such a dataset can be done by just changing the `input_fname_pattern` to the correct file ending and specifying the folder name with `dataset`.
 *(The folder with the dataset has to be in the subfolder data)*
+
+**Folder structure used for our experiments:**
+
+* **ABC-GAN**
+  * **data**
+    * **celebA**
+    * **cifar10**
+    * **lsun**
+    * **train_64x64**
+  * download.py
+  * LICENSE
+  * main.py
+  * model.py
+  * ops.py
+  * utils.py
+  * README.md
+  * **report**
+
+*train_64x64 is referring to the ImageNet subset. We used the same one as used in [Improved Wasserstein GAN](https://github.com/igul222/improved_wgan_training)*
+
 
 #### Special Case LSUN
 
@@ -68,21 +91,22 @@ In order to use LSUN just again change the `input_fname_pattern` and switch the 
 
 One of the most important points during training of GANs is balancing the discriminator against the generator. If one of the two dominates the other a mode collapse can occur. Many people started playing around with the ratio between discriminator and generator. And others used thresholds to determine if one has to train the discriminator or the generator. 
 
-In our work we implemented a simple controller to get rid of this manual tuning. We end up controlling the probability of an image being real from the discriminators point of view. Without a controller this probability ends up being somewhere close to 0.5 since the discriminator has (once the network starts converging) a 50% chance of telling correctly if the samples he sees are coming from the real dataset or the generator. 
+In our work, we implemented a simple controller to get rid of this manual tuning. We end up controlling the probability of an image being real from the discriminator's point of view. Without a controller, this probability ends up being somewhere close to 0.5 since the discriminator has (once the network starts converging) a 50% chance of telling correctly if the samples he sees are coming from the real dataset or the generator. 
 
 The controller gives you the following benefits:
 
 * Reduced training time
-* Reuse the same network for different datasets (The controller automaticall adapts to other datasets so you don't have to tune the ratio between D and G anymore)
-* In some cases the controller also improves stability during training
+* Reuse the same network for different datasets (The controller automatically adapts to other datasets so you don't have to tune the ratio between D and G anymore)
+* In some cases, the controller also improves stability during training
 
 ### Controller
 
 **Controller architecture**:
 
-*Note: The Realism is calculated using the two losses of the dscriminator (loss for real and for fake images).*
+*Note: The Realism is calculated using the two losses of the discriminator (loss for real and for fake images).*
 
 ![controller](report/controller.png)
+
 The controller tries to keep the avg. realism always at a reference point. The output of the controller is a probability of training either the discriminator or the generator.
 
 ### Controllability
@@ -94,9 +118,9 @@ The controller tries to keep the avg. realism always at a reference point. The o
 ![probability of real image from discriminators point of view with controller](report/prob_of_real_image_with_controller.png)
 ![probability of real image from discriminators point of view without controller](report/prob_of_real_image_without_controller.png)
 
-Left image shows the probability of being a real image using the controller. Right, the same experiment without the controller.
+The left image shows the probability of being a real image using the controller. Right, the same experiment without the controller.
 
-What we essentially do using the controller is, we control how many samples coming from the generator should be classified by the discriminator as real. By chance this value stays at around 0.5 since after convergence the discriminator has a 50% chance of correctly classifying an image as real or fake. The controller reduces this value *(in our case from 0.5 to around 0.25)* which makes sure that the discriminator always has a good chance to correctly classify the source of an image. Therefore, the discriminator always slighlty dominates the generator. 
+What we essentially do using the controller is, we control how many samples coming from the generator should be classified by the discriminator as real. By chance, this value stays at around 0.5 since after convergence the discriminator has a 50% chance of correctly classifying an image as real or fake. The controller reduces this value *(in our case from 0.5 to around 0.25)* which makes sure that the discriminator always has a good chance to correctly classify the source of an image. Therefore, the discriminator always slightly dominates the generator. 
 
 ### Training behaviour
 
@@ -105,7 +129,7 @@ What we essentially do using the controller is, we control how many samples comi
 *Note: Without a controller and a fixed ratio between discriminator and generator updates we would see two straight lines*
 
 ![training curve G against D](report/controller_training_curve.png)
-Through the controller the training of the networks adapts itself. In the beginning the generator is getting trained more often but after around 5k steps the discriminator takes over. As known from GAN theory we actually want the discriminator to dominate the generator. And without a controller this is not achievable without chaning the loss function (Wasserstein Loss, Cramer loss etc.)
+Through the controller, the training of the networks adapts itself. In the beginning, the generator is getting trained more often but after around 5k steps the discriminator takes over. As known from GAN theory we actually want the discriminator to dominate the generator. And without a controller, this is very hard to achieve without changing the loss function (Wasserstein Loss, Cramer loss etc.)
 
 
 **Convergence speed comparison of DCGAN with different GpD ratios and our controller**
@@ -119,7 +143,7 @@ Comparison of convergence speed. GpD: Generator per Discriminator training itera
 
 ## Adaptive Blur
 
-GANs still have trouble with stability, image quality and output resolution. We implemented an adaptive blur filter to assist the discriminator and therefore improve overall results. We figured out that the discriminator has issues with details in images. To overcome this issue we just blur all images before they reach the discriminator. So in the end, the discriminator either sees blurred images from the generator or blurred images of the dataset. Using a fixed blur such as a 3 by 3 gaussian kernel as we used in our experiments, has the side effect of additional noise in the output image. Since the generator has not to care about the details (since his output will be blurred anyway) he can add noise. To mitigate this effect, we added an adaptive blur which changes over training time. In the beginning, we have a strong blur such that the GAN can focus on improving the base structure of the output. In the end of the training we have almost no blur, such that the GAN can now focus on the details. 
+GANs still have trouble with stability, image quality and output resolution. We implemented an adaptive blur filter to assist the discriminator and therefore improve overall results. We figured out that the discriminator has issues with details in images. To overcome this issue we just blur all images before they reach the discriminator. So in the end, the discriminator either sees blurred images from the generator or blurred images of the dataset. Using a fixed blur such as a 3 by 3 Gaussian kernel as we used in our experiments, has the side effect of additional noise in the output image. Since the generator has not to care about the details (since his output will be blurred anyway) he can add noise. To mitigate this effect, we added an adaptive blur which changes over training time. In the beginning, we have a strong blur such that the GAN can focus on improving the base structure of the output. In the end of the training, we have almost no blur, such that the GAN can now focus on the details. 
 
 The blur gives you the following benefits:
 
@@ -132,28 +156,28 @@ The blur gives you the following benefits:
 **Image showing plain DCGAN without and with blur (DCGAN+B)**
 
 ![DCGAN without and with blur](report/dcgan_with_and_without_blur.png)
-The resulting imaes look much better with blur than without. They have more details but also noise.
+The resulting images look much better with blur than without. They have more details but also noise.
 
 **Comparison of different blurring strategies**
 
-*We compare two regressive blur kernel (e.g. make sigma of a gaussian blur smaller during training)*
+*We compare two regressive blur kernel (e.g. make sigma of a Gaussian blur smaller during training)*
 
 ![Comparison of blurring strategies](report/blurring_strategies_comparison.png)
-The hyperbolic decreasing gaussian blur is best when it comes to reducing the noise in the images. 
+The hyperbolic decreasing Gaussian blur is best when it comes to reducing the noise in the images. 
 
 ## ABC-GAN
 
 Combination of the Adaptive Blur and Controller GAN.
 
-We conducted different experiments using various datasets such as LSUN, CIFAR10 and CelebA. Some of the resulting images have been downscaled by a factor of two in order to reduce noise. *(Since on smoe screens and also printed the noise looks very annoying.)*
+We conducted different experiments using various datasets such as LSUN, CIFAR10 and CelebA. Some of the resulting images have been downscaled by a factor of two in order to reduce noise. *(Since on some screens and also printed the noise looks very annoying.)*
 
-*Note: In some samples you will see a green bar at the top. The bar is indicating the probability of the image coming from the real dataset rather than from the generator. We used the discriminator losses and a softmax to evaluate this probability.*
+***Note:*** *In some samples, you will see a green bar at the top. The bar is indicating the probability of the image coming from the real dataset rather than from the generator. We used the discriminator losses and a softmax to evaluate this probability.*
 
 ### LSUN bedrooms dataset
 
 **ABC-GAN with a fixed Gaussian Blur kernel of 3x3 and output resolution of 256 by 256 pixels**
 
-*Random sampled batch. Downscaled to 128 by 128 pixels to reduce noise.*
+*Randomly sampled batch. Downscaled to 128 by 128 pixels to reduce noise.*
 
 ![lsun using ABC-GAN with fixed kernel and downscaled to 128 by 128 pixels](report/lsun_fixed_blur_3x3_o256_downscaled_to_128.png)
 We seem to reach the limit of DCGAN with this experiment. The same experiment without Blur failed. The images look not very realistic but one still sees that some of them look close to bedrooms.
@@ -175,7 +199,7 @@ We seem to reach the limit of DCGAN with this experiment. The same experiment wi
 
 ## Acknowledgement
 
-* Thanks Prof. Luc Van Gool for the semesterthesis at the Computer Vision Lab D-ITET at ETH Zurich
+* Thanks, Prof. Luc Van Gool for the semester thesis at the Computer Vision Lab D-ITET at ETH Zurich
 * Thanks for supervising this thesis Eirikur Agustsson and Radu Timofte
 * This work has been based on the [DCGAN implementation found on GitHub](https://github.com/carpedm20/DCGAN-tensorflow)
 
