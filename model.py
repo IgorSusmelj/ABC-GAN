@@ -119,34 +119,52 @@ class DCGAN(object):
     if self.y_dim:
       self.G = self.generator(self.z, self.y)
       self.D, self.D_logits = \
-          self.discriminator(gauss_blur(inputs, self.batch_size, kernel=self.gauss_kernel, output_height=self.output_height, blur_strategy=self.blur_strategy), self.y, reuse=False)
+          self.discriminator(gauss_blur(inputs, 
+                                        self.batch_size, 
+                                        kernel=self.gauss_kernel, 
+                                        output_height=self.output_height, 
+                                        blur_strategy=self.blur_strategy), 
+                             self.y, reuse=False)
 
       self.sampler = self.sampler(self.z, self.y)
       self.D_, self.D_logits_ = \
-          self.discriminator(gauss_blur(self.G, self.batch_size, kernel=self.gauss_kernel, output_height=self.output_height, blur_strategy=self.blur_strategy), self.y, reuse=True)
+          self.discriminator(gauss_blur(self.G, 
+                                        self.batch_size, 
+                                        kernel=self.gauss_kernel, 
+                                        output_height=self.output_height, 
+                                        blur_strategy=self.blur_strategy), 
+                             self.y, reuse=True)
       self.R, self.R_logits = \
-          self.realisticness_estimator(gauss_blur(self.G, self.batch_size, kernel=self.gauss_kernel, output_height=self.output_height, blur_strategy=self.blur_strategy), self.y, reuse=True)
+          self.realisticness_estimator(gauss_blur(self.G, 
+                                                  self.batch_size, 
+                                                  kernel=self.gauss_kernel, 
+                                                  output_height=self.output_height, 
+                                                  blur_strategy=self.blur_strategy), 
+                                       self.y, reuse=True)
     else:
       self.G = self.generator(self.z)
-      self.D, self.D_logits = self.discriminator(gauss_blur(inputs, 
-                                                            self.batch_size, 
-                                                            kernel=self.gauss_kernel, 
-                                                            output_height=self.output_height, 
-                                                            blur_strategy=self.blur_strategy))
+      self.D, self.D_logits = \
+            self.discriminator(gauss_blur(inputs, 
+                                          self.batch_size, 
+                                          kernel=self.gauss_kernel, 
+                                          output_height=self.output_height, 
+                                          blur_strategy=self.blur_strategy))
 
       self.sampler = self.sampler(self.z)
-      self.D_, self.D_logits_ = self.discriminator(gauss_blur(self.G, 
-                                                              self.batch_size, 
-                                                              kernel=self.gauss_kernel, 
-                                                              output_height=self.output_height, 
-                                                              blur_strategy=self.blur_strategy), 
-                                                              reuse=True)
-      self.R, self.R_logits = self.realisticness_estimator(gauss_blur(self.G, 
-                                                                      self.batch_size, 
-                                                                      kernel=self.gauss_kernel, 
-                                                                      output_height=self.output_height, 
-                                                                      blur_strategy=self.blur_strategy), 
-                                                                      reuse=True)
+      self.D_, self.D_logits_ = \
+            self.discriminator(gauss_blur(self.G, 
+                                          self.batch_size, 
+                                          kernel=self.gauss_kernel, 
+                                          output_height=self.output_height, 
+                                          blur_strategy=self.blur_strategy), 
+                               reuse=True)
+      self.R, self.R_logits = \
+            self.realisticness_estimator(gauss_blur(self.G, 
+                                                    self.batch_size, 
+                                                    kernel=self.gauss_kernel, 
+                                                    output_height=self.output_height, 
+                                                    blur_strategy=self.blur_strategy), 
+                                         reuse=True)
 
     self.d_sum = histogram_summary("d", self.D)
     self.d__sum = histogram_summary("d_", self.D_)
@@ -182,11 +200,17 @@ class DCGAN(object):
                                                 self.D_prob_fake_G_image_mean)
 
 
-    self.GD_training_iterations = tf.placeholder(tf.int32, None, name='GD_training_iterations')
-    self.GD_training_iterations_sum = scalar_summary("GD_training_iterations", self.GD_training_iterations)
+    self.GD_training_iterations = tf.placeholder(tf.int32, 
+                                                 None, 
+                                                 name='GD_training_iterations')
+    self.GD_training_iterations_sum = scalar_summary("GD_training_iterations", 
+                                                     self.GD_training_iterations)
 
-    self.GD_controller_error = tf.placeholder(tf.float32, None, name='GD_controller_error')
-    self.GD_controller_error_sum = scalar_summary("GD_controller_error", self.GD_controller_error)
+    self.GD_controller_error = tf.placeholder(tf.float32, 
+                                              None, 
+                                              name='GD_controller_error')
+    self.GD_controller_error_sum = scalar_summary("GD_controller_error", 
+                                                  self.GD_controller_error)
 
     self.d_loss_real_sum = scalar_summary("d_loss_real", self.d_loss_real)
     self.d_loss_fake_sum = scalar_summary("d_loss_fake", self.d_loss_fake)
@@ -306,7 +330,10 @@ class DCGAN(object):
           tmp = np.array([[1,2,1],
                           [2,4,2],
                           [1,2,1]], dtype=np.float32)/(3*16) # define our kernel
-          tmp = np.lib.pad(tmp, ((3,3), (3,3)), 'constant', constant_values=(0)) # pad kernel with zeros to fill up for 9x9 kernel
+          tmp = np.lib.pad(tmp, 
+                           ((3,3), (3,3)), 
+                           'constant', 
+                           constant_values=(0)) # pad kernel with zeros to fill up for 9x9 kernel
           blur_gauss_kernel = np.array([tmp, tmp, tmp])
           gauss_kernel = blur_gauss_kernel.reshape(9,9,3,1)
         elif config.blur_strategy == "reg_lin":
@@ -320,7 +347,10 @@ class DCGAN(object):
 
         # evaluate generator to discriminator ratio
         # here we compute some intermediate results
-        self.target_G_quality = self.target_starting_G_quality + (self.target_ending_G_quality-self.target_starting_G_quality)*(epoch/config.epoch)
+        self.target_G_quality = \
+                    self.target_starting_G_quality + \
+                    (self.target_ending_G_quality-self.target_starting_G_quality)\
+                    *(epoch/config.epoch)
         #self.target_G_quality += 0.2 * np.sin(counter/500.0)
         
         # for sampling generated images from z space using sampler
@@ -336,7 +366,8 @@ class DCGAN(object):
         
         # here we compute the error we want to minimize
         self.control_error = self.actual_G_quality - self.target_G_quality 
-        self.G2D_ratio = np.clip(self.G2D_ratio + self.control_gain*self.control_error, a_min=0, a_max=1) 
+        self.G2D_ratio = np.clip(self.G2D_ratio + self.control_gain*self.control_error, 
+                                 a_min=0, a_max=1) 
          
 
 
@@ -474,7 +505,8 @@ class DCGAN(object):
         if np.mod(counter, config.sample_every) == 1:
           if config.dataset == 'mnist':
             # for sampling generated images from z space using sampler
-            samples, d_loss, g_loss, d_loss_real, self.actual_G_quality = self.sess.run( [self.sampler, self.d_loss, 
+            samples, d_loss, g_loss, d_loss_real, self.actual_G_quality = \
+             self.sess.run( [self.sampler, self.d_loss, 
               self.g_loss, self.D_prob_fake_G_image,
               self.D_prob_fake_G_image_mean],
               feed_dict={
@@ -574,7 +606,8 @@ class DCGAN(object):
         h0 = lrelu(conv2d(x, self.c_dim + self.y_dim, name='d_h0_conv'))
         h0 = conv_cond_concat(h0, yb)
 
-        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim + self.y_dim, name='d_h1_conv'), train=False))
+        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim + self.y_dim, name='d_h1_conv'), 
+                              train=False))
         h1 = tf.reshape(h1, [self.batch_size, -1])      
         h1 = concat([h1, y], 1)
         
@@ -691,10 +724,12 @@ class DCGAN(object):
         h1 = conv_cond_concat(h1, yb)
 
         h2 = tf.nn.relu(self.g_bn2(
-            deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2'), train=False))
+            deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2'), 
+                     train=False))
         h2 = conv_cond_concat(h2, yb)
 
-        return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+        return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], 
+                             name='g_h3'))
 
   def load_mnist(self):
     data_dir = os.path.join("./data", self.dataset_name)
