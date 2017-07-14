@@ -310,12 +310,12 @@ class DCGAN(object):
           blur_gauss_kernel = np.array([tmp, tmp, tmp])
           gauss_kernel = blur_gauss_kernel.reshape(9,9,3,1)
         elif config.blur_strategy == "reg_lin":
-          sigma_interp = 5.0 - (epoch/config.epoch)*4.5 # linearly interpolate sigma between 5.0 and 0.5
+          sigma_interp = 5.0 - ((epoch+1)/config.epoch)*4.5 # linearly interpolate sigma between 5.0 and 0.5
           gauss_kernel = gauss_blur_kernel(sigma_interp)
         else: # hyperbolic or unused if None
           sig_alpha = 5.0 # increase to start with stronger blur
           sig_beta = 12.0 # increase to decrease blur faster 
-          sigma_interp = sig_alpha/(sig_beta*(epoch/config.epoch)+1)
+          sigma_interp = sig_alpha/(sig_beta*((epoch+1)/config.epoch)+1)
           gauss_kernel = gauss_blur_kernel(sigma_interp)
 
         # evaluate generator to discriminator ratio

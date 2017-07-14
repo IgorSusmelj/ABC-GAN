@@ -20,11 +20,8 @@ We added some special flags to have a better overview of the different experimen
 Here are some examples to train the ABC-GAN with datasets:
 
 * `python main.py --dataset celebA --folder_suffix=_abcgan_1_GpD_o64 --input_height=128 --output_height=64 --GpD_ratio=1 --blur_strategy=3x3 --epoch=8 --train --crop True`
-* `python main.py --dataset celebA --folder_suffix=_abcgan_1_GpD_o64 --input_height=128 --output_height=64 --GpD_ratio=1 --blur_strategy=3x3 --epoch=8 --train --crop True`
-
-
-
-
+* `python main.py --dataset lsun --folder_suffix=_abcgan_lsun_controller_blur_3x3_o128 --input_fname_pattern=*.webp --input_height=256 --output_height=128 --GpD_ratio=-1 --blur_strategy=3x3 --epoch=20 --batch-size=64 --train --crop True`
+* `python main.py --dataset cifar10 --folder_suffix=_abcgan_cifar_3GpD_regressive_hyperbolic_o32 --input_height=32 --input_fname_pattern=*.png --output_height=32 --blur_strategy=reg_hyp --epoch=100 --train --crop True`
 
 ### Datasets
 
@@ -95,7 +92,7 @@ In our work, we implemented a simple controller to get rid of this manual tuning
 
 The controller gives you the following benefits:
 
-* Reduced training time
+* Reduced training time (up to a factor of 5)
 * Reuse the same network for different datasets (The controller automatically adapts to other datasets so you don't have to tune the ratio between D and G anymore)
 * In some cases, the controller also improves stability during training
 
