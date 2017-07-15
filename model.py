@@ -13,6 +13,11 @@ from utils import *
 def conv_out_size_same(size, stride):
   return int(math.ceil(float(size) / float(stride)))
 
+
+ 
+def blur_wrapper_fake(input_data):
+  return input_data
+
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
@@ -20,7 +25,7 @@ class DCGAN(object):
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None,
 				 log_dir=None,
-         blur_strategy="None"):
+         blur_strategy="None", loose_encoder=False):
     """
 
     Args:
@@ -45,6 +50,9 @@ class DCGAN(object):
     self.output_height = output_height
     self.output_width = output_width
 
+    # with loose encoder flag
+    self.with_loose_encoder = loose_encoder
+
     self.y_dim = y_dim
     self.z_dim = z_dim
 
@@ -55,6 +63,11 @@ class DCGAN(object):
     self.dfc_dim = dfc_dim
 
     # batch normalization : deals with poor initialization helps gradient flow
+    if self.with_loose_encoder:
+      self.e_bn1 = batch_norm(name='e_bn1')
+      self.e_bn2 = batch_norm(name='e_bn2')
+      self.e_bn3 = batch_norm(name='e_bn3')
+
     self.d_bn1 = batch_norm(name='d_bn1')
     self.d_bn2 = batch_norm(name='d_bn2')
 
@@ -92,6 +105,14 @@ class DCGAN(object):
     self.log_dir = log_dir
 
     self.build_model()
+  
+  
+  def blur_wrapper(self, input_data):
+    return gauss_blur(input_data, 
+               self.batch_size, 
+               kernel=self.gauss_kernel, 
+               output_height=self.output_height, 
+               blur_strategy=self.blur_strategy)
 
   def build_model(self):
     if self.y_dim:
@@ -107,7 +128,10 @@ class DCGAN(object):
     self.sample_inputs = tf.placeholder(
       tf.float32, [self.sample_num] + image_dims, name='sample_inputs')
   
-    self.gauss_kernel = tf.placeholder(tf.float32, [9,9,3,1], name='gauss_kernel')
+    if self.blur_strategy == "3x3":
+      self.gauss_kernel = tf.placeholder(tf.float32, [3,3,3,1], name='gauss_kernel')
+    else:
+      self.gauss_kernel = tf.placeholder(tf.float32, [9,9,3,1], name='gauss_kernel')
 
     inputs = self.inputs
     sample_inputs = self.sample_inputs
@@ -116,14 +140,24 @@ class DCGAN(object):
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
 
+    # add loose-encoder network
+    if self.with_loose_encoder:
+      self.E = self.encoder(inputs)
+    else:
+      self.E = inputs
+    self.E_sum = histogram_summary("E", self.E)
+
+    # create blur_wrapper
+    gaussian_blur = blur_wrapper_fake if self.blur_strategy == "None" else self.blur_wrapper
+
+
     if self.y_dim:
       self.G = self.generator(self.z, self.y)
+      # second generator which completes the encoder to an auto-encoder
+      if self.with_loose_encoder:
+        self.G_ae = self.generator(self.E, self.y, reuse=True) # shares weights with G
       self.D, self.D_logits = \
-          self.discriminator(gauss_blur(inputs, 
-                                        self.batch_size, 
-                                        kernel=self.gauss_kernel, 
-                                        output_height=self.output_height, 
-                                        blur_strategy=self.blur_strategy), 
+          self.discriminator(gaussian_blur(inputs), 
                              self.y, reuse=False)
 
       self.sampler = self.sampler(self.z, self.y)
@@ -134,6 +168,39 @@ class DCGAN(object):
                                         output_height=self.output_height, 
                                         blur_strategy=self.blur_strategy), 
                              self.y, reuse=True)
+      if self.with_loose_encoder:
+        self.D_ae, self.D_ae_logits = \
+          self.discriminator(gauss_blur(self.G_ae, 
+                                        self.batch_size, 
+                                        kernel=self.gauss_kernel, 
+                                        output_height=self.output_height, 
+                                        blur_strategy=self.blur_strategy), 
+                             self.y, reuse=True)
+      
+      # second discriminator D2
+      if self.with_loose_encoder:
+        self.D2, self.D2_logits = \
+          self.discriminator(gauss_blur(inputs, 
+                                        self.batch_size, 
+                                        kernel=self.gauss_kernel, 
+                                        output_height=self.output_height, 
+                                        blur_strategy=self.blur_strategy), 
+                             self.y, 
+                             scope_name="discriminator2",
+                             reuse=False)
+
+      if self.with_loose_encoder:
+        self.D2_ae, self.D2_ae_logits = \
+          self.discriminator(gauss_blur(self.G_ae, 
+                                        self.batch_size, 
+                                        kernel=self.gauss_kernel, 
+                                        output_height=self.output_height, 
+                                        blur_strategy=self.blur_strategy), 
+                             self.y, 
+                             scope_name="discriminator2",
+                             reuse=True)
+
+
       self.R, self.R_logits = \
           self.realisticness_estimator(gauss_blur(self.G, 
                                                   self.batch_size, 
@@ -143,27 +210,34 @@ class DCGAN(object):
                                        self.y, reuse=True)
     else:
       self.G = self.generator(self.z)
+      # second generator which completes the encoder to an auto-encoder
+      if self.with_loose_encoder:
+        self.G_ae = self.generator(self.E, reuse=True) # shares weights with G
+
       self.D, self.D_logits = \
-            self.discriminator(gauss_blur(inputs, 
-                                          self.batch_size, 
-                                          kernel=self.gauss_kernel, 
-                                          output_height=self.output_height, 
-                                          blur_strategy=self.blur_strategy))
+            self.discriminator(gaussian_blur(inputs))
 
       self.sampler = self.sampler(self.z)
       self.D_, self.D_logits_ = \
-            self.discriminator(gauss_blur(self.G, 
-                                          self.batch_size, 
-                                          kernel=self.gauss_kernel, 
-                                          output_height=self.output_height, 
-                                          blur_strategy=self.blur_strategy), 
+            self.discriminator(gaussian_blur(self.G), 
                                reuse=True)
+      if self.with_loose_encoder:
+        self.D_ae, self.D_ae_logits = \
+            self.discriminator(gaussian_blur(self.G_ae), 
+                               reuse=True)
+      # second discriminator D2
+      if self.with_loose_encoder:
+        self.D2, self.D2_logits = \
+            self.discriminator(gaussian_blur(inputs), 
+                               scope_name="discriminator2")
+      if self.with_loose_encoder:
+        self.D2_ae, self.D2_ae_logits = \
+            self.discriminator(gaussian_blur(self.G_ae), 
+                               scope_name="discriminator2",
+                               reuse=True)
+      
       self.R, self.R_logits = \
-            self.realisticness_estimator(gauss_blur(self.G, 
-                                                    self.batch_size, 
-                                                    kernel=self.gauss_kernel, 
-                                                    output_height=self.output_height, 
-                                                    blur_strategy=self.blur_strategy), 
+            self.realisticness_estimator(gaussian_blur(self.G), 
                                          reuse=True)
 
     self.d_sum = histogram_summary("d", self.D)
@@ -180,8 +254,31 @@ class DCGAN(object):
       sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
     self.d_loss_fake = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
+    
     self.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
+
+    # loss for "auto-encoder"
+    if self.with_loose_encoder:
+      self.d_loss_fake_ae = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_ae_logits, tf.zeros_like(self.D_ae)))
+    if self.with_loose_encoder:
+      self.g_ae_loss = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_ae_logits, tf.ones_like(self.D_ae)))
+ 
+    if self.with_loose_encoder:
+      self.d2_loss_real = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D2_logits, tf.ones_like(self.D2)))
+    if self.with_loose_encoder:
+      self.d2_loss_fake_ae = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D2_ae_logits, tf.zeros_like(self.D2_ae)))
+
+    if self.with_loose_encoder:
+      self.g_d2_loss = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D2_ae_logits, tf.ones_like(self.D2_ae)))
+
+
+
 
     # calculate probability of given image is real or not
     self.g_loss_D_raw = sigmoid_cross_entropy_with_logits(self.R_logits, 
@@ -216,12 +313,20 @@ class DCGAN(object):
     self.d_loss_fake_sum = scalar_summary("d_loss_fake", self.d_loss_fake)
                           
     self.d_loss = self.d_loss_real + self.d_loss_fake
+    if self.with_loose_encoder:
+      self.d_loss += self.d_loss_fake_ae
+      self.d2_loss = self.d2_loss_real + self.d2_loss_fake_ae
+      self.g_ae_loss += self.g_d2_loss
 
     self.g_loss_sum = scalar_summary("g_loss", self.g_loss)
     self.d_loss_sum = scalar_summary("d_loss", self.d_loss)
+    if self.with_loose_encoder:
+      self.g_ae_loss_sum = scalar_summary("g_ae_loss", self.g_ae_loss)
+      self.d2_loss_sum = scalar_summary("d2_loss", self.d2_loss)
 
     t_vars = tf.trainable_variables()
 
+    self.e_vars = [var for var in t_vars if 'e_' in var.name]
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
 
@@ -232,6 +337,15 @@ class DCGAN(object):
               .minimize(self.d_loss, var_list=self.d_vars)
     g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.g_loss, var_list=self.g_vars)
+    # optimize loss of the loose-encoder ("auto-encoder") path incl. encoder
+    # note here that the encoder E only gets trained this way. No L2 loss etc.
+    if self.with_loose_encoder:
+      g_ae_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
+              .minimize(self.g_ae_loss, var_list=self.g_vars+self.e_vars)
+    if self.with_loose_encoder:
+      d2_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
+              .minimize(self.d2_loss, var_list=self.d_vars)
+
     try:
       tf.global_variables_initializer().run()
     except:
@@ -242,7 +356,11 @@ class DCGAN(object):
       self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
     self.d_sum = merge_summary(
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
-    
+    if self.with_loose_encoder:
+      self.g_ae_sum = merge_summary([self.g_ae_loss_sum])
+    if self.with_loose_encoder:
+      self.d2_sum = merge_summary([self.d2_loss_sum])
+
     self.writer = SummaryWriter(self.log_dir + '/Discriminator', self.sess.graph)
     self.writer2 = SummaryWriter(self.log_dir + '/Generator')
 
@@ -330,12 +448,8 @@ class DCGAN(object):
           tmp = np.array([[1,2,1],
                           [2,4,2],
                           [1,2,1]], dtype=np.float32)/(3*16) # define our kernel
-          tmp = np.lib.pad(tmp, 
-                           ((3,3), (3,3)), 
-                           'constant', 
-                           constant_values=(0)) # pad kernel with zeros to fill up for 9x9 kernel
           blur_gauss_kernel = np.array([tmp, tmp, tmp])
-          gauss_kernel = blur_gauss_kernel.reshape(9,9,3,1)
+          gauss_kernel = blur_gauss_kernel.reshape(3,3,3,1)
         elif config.blur_strategy == "reg_lin":
           sigma_interp = 5.0 - ((epoch+1)/config.epoch)*4.5 # linearly interpolate sigma between 5.0 and 0.5
           gauss_kernel = gauss_blur_kernel(sigma_interp)
@@ -385,16 +499,39 @@ class DCGAN(object):
                   self.gauss_kernel: gauss_kernel
                 })
               self.writer.add_summary(summary_str, counter)
+
+              # Update D2 network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([d2_optim, self.d2_sum],
+                  feed_dict={ 
+                    self.inputs: batch_images,
+                    self.z: batch_z,
+                    self.y:batch_labels,
+                    self.gauss_kernel: gauss_kernel
+                  })
+                self.writer.add_summary(summary_str, counter)
+
             else:
               G_iteration_counter += 1
               # Update G network
               _, summary_str = self.sess.run([g_optim, self.g_sum],
                 feed_dict={
+                  self.inputs: batch_images,
                   self.z: batch_z, 
                   self.y:batch_labels,
                 self.gauss_kernel: gauss_kernel
                 })
               self.writer.add_summary(summary_str, counter)
+              # Update G_ae network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([g_ae_optim, self.g_ae_sum],
+                  feed_dict={
+                    self.inputs: batch_images,
+                    self.z: batch_z, 
+                    self.y:batch_labels,
+                  self.gauss_kernel: gauss_kernel
+                  })
+                self.writer.add_summary(summary_str, counter)
           else:
             for i in range(1):
               D_iteration_counter += 1
@@ -407,16 +544,37 @@ class DCGAN(object):
                   self.gauss_kernel: gauss_kernel
                 })
               self.writer.add_summary(summary_str, counter)
+              # Update D2 network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([d2_optim, self.d2_sum],
+                  feed_dict={ 
+                    self.inputs: batch_images,
+                    self.z: batch_z,
+                    self.y:batch_labels,
+                    self.gauss_kernel: gauss_kernel
+                  })
+                self.writer.add_summary(summary_str, counter)
             for i in range(config.GpD_ratio):
               G_iteration_counter += 1
               # Update G network
               _, summary_str = self.sess.run([g_optim, self.g_sum],
                 feed_dict={
+                  self.inputs: batch_images,
                   self.z: batch_z, 
                   self.y:batch_labels,
                 self.gauss_kernel: gauss_kernel
                 })
               self.writer.add_summary(summary_str, counter)
+              # Update G_ae network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([g_ae_optim, self.g_ae_sum],
+                  feed_dict={
+                    self.inputs: batch_images,
+                    self.z: batch_z, 
+                    self.y:batch_labels,
+                  self.gauss_kernel: gauss_kernel
+                  })
+                self.writer.add_summary(summary_str, counter)
 
 
           errD_fake = self.d_loss_fake.eval({
@@ -443,13 +601,28 @@ class DCGAN(object):
                             self.z: batch_z,
                             self.gauss_kernel: gauss_kernel })
               self.writer.add_summary(summary_str, counter)
+              # Update D2 network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([d2_optim, self.d2_sum],
+                  feed_dict={ self.inputs: batch_images, 
+                              self.z: batch_z,
+                              self.gauss_kernel: gauss_kernel })
+                self.writer.add_summary(summary_str, counter)
             else:
               G_iteration_counter += 1
               # Update G network
               _, summary_str = self.sess.run([g_optim, self.g_sum],
-                feed_dict={ self.z: batch_z,
+                feed_dict={ self.inputs: batch_images, 
+                            self.z: batch_z,
                             self.gauss_kernel: gauss_kernel })
               self.writer.add_summary(summary_str, counter)
+              # Update G_ae network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([g_ae_optim, self.g_ae_sum],
+                  feed_dict={ self.inputs: batch_images, 
+                              self.z: batch_z,
+                              self.gauss_kernel: gauss_kernel })
+                self.writer.add_summary(summary_str, counter)
           else:
             for i in range(1): # update discriminator once
               D_iteration_counter += 1
@@ -459,13 +632,28 @@ class DCGAN(object):
                             self.z: batch_z,
                             self.gauss_kernel: gauss_kernel })
               self.writer.add_summary(summary_str, counter)
+              # Update D2 network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([d2_optim, self.d2_sum],
+                  feed_dict={ self.inputs: batch_images, 
+                              self.z: batch_z,
+                              self.gauss_kernel: gauss_kernel })
+                self.writer.add_summary(summary_str, counter)
             for i in range(config.GpD_ratio):
               G_iteration_counter += 1
               # Update G network
               _, summary_str = self.sess.run([g_optim, self.g_sum],
-                feed_dict={ self.z: batch_z,
+                feed_dict={ self.inputs: batch_images, 
+                            self.z: batch_z,
                             self.gauss_kernel: gauss_kernel })
               self.writer.add_summary(summary_str, counter)
+              # Update G_ae network
+              if self.with_loose_encoder:
+                _, summary_str = self.sess.run([g_ae_optim, self.g_ae_sum],
+                  feed_dict={ self.inputs: batch_images, 
+                              self.z: batch_z,
+                              self.gauss_kernel: gauss_kernel })
+                self.writer.add_summary(summary_str, counter)
 
 
           errD_fake = self.d_loss_fake.eval({ self.z: batch_z,
@@ -504,9 +692,12 @@ class DCGAN(object):
 
         if np.mod(counter, config.sample_every) == 1:
           if config.dataset == 'mnist':
-            # for sampling generated images from z space using sampler
+            # for sampling generated images from z space using GENERATOR
+            # Note that there seems to be an issue with batch normalization in 
+            # inference mode and our architecture (loose-encoder) so we have
+            # to run BN in training mode
             samples, d_loss, g_loss, d_loss_real, self.actual_G_quality = \
-             self.sess.run( [self.sampler, self.d_loss, 
+             self.sess.run( [self.G, self.d_loss, 
               self.g_loss, self.D_prob_fake_G_image,
               self.D_prob_fake_G_image_mean],
               feed_dict={
@@ -529,9 +720,12 @@ class DCGAN(object):
 
           else:
             try:
-              # for sampling generated images from z space using sampler
+              # for sampling generated images from z space using GENERATOR
+              # Note that there seems to be an issue with batch normalization in 
+              # inference mode and our architecture (loose-encoder) so we have
+              # to run BN in training mode
               samples, d_loss, g_loss, d_loss_real = self.sess.run(
-              [self.sampler, self.d_loss, 
+              [self.G, self.d_loss, 
               self.g_loss, self.D_prob_fake_G_image],
                 feed_dict={
                     self.z: sample_z,
@@ -556,8 +750,23 @@ class DCGAN(object):
         if np.mod(counter, 500) == 2:
           self.save(self.checkpoint_dir, counter)
 
-  def discriminator(self, image, y=None, reuse=False):
-    with tf.variable_scope("discriminator") as scope:
+
+  def encoder(self, image, y=None, reuse=False):
+    """ The encoder has more or less the same structure as the discriminator
+    """
+    with tf.variable_scope("encoder") as scope:
+      if reuse:
+        scope.reuse_variables()
+      h0 = tf.nn.relu(conv2d(image, self.df_dim, name="e_h0_conv"))
+      h1 = tf.nn.relu(self.e_bn1(conv2d(h0, self.df_dim*2, name='e_h1_conv')))
+      h2 = tf.nn.relu(self.e_bn2(conv2d(h1, self.df_dim*4, name='e_h2_conv')))
+      h3 = tf.nn.relu(self.e_bn3(conv2d(h2, 500, name='e_h3_conv'))) # fixed output of encoder
+      h4 = linear(tf.reshape(h3, [self.batch_size, -1]), self.z_dim, 'e_h3_lin')
+      return tf.nn.tanh(h4)
+
+
+  def discriminator(self, image, y=None, scope_name="discriminator", reuse=False):
+    with tf.variable_scope(scope_name) as scope:
       if reuse:
         scope.reuse_variables()
 
@@ -618,8 +827,11 @@ class DCGAN(object):
         
         return tf.nn.sigmoid(h3), h3
 
-  def generator(self, z, y=None):
+  def generator(self, z, y=None, reuse=False):
     with tf.variable_scope("generator") as scope:
+      if reuse:
+        scope.reuse_variables()
+
       if not self.y_dim:
         s_h, s_w = self.output_height, self.output_width
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)

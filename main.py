@@ -32,6 +32,7 @@ flags.DEFINE_integer("GpD_ratio", -1, "Generator per discriminator training iter
 flags.DEFINE_string("blur_strategy", "reg_hyp", "Blur strategy to use for training. [None, 3x3, reg_lin, reg_hyp]")
 flags.DEFINE_boolean("with_overlay", False, "If True, an overlay indicating the realism from the discriminators point of view will be added to all images in a batch. Additionally each batch will be sorted using this realism. Most realistic image on bottom right. [False]")
 flags.DEFINE_integer("sample_every", 1000, "Sample a new image all x iterations during training. [1000]")
+flags.DEFINE_boolean("with_loose_encoder", False, "If True, the experimental loose encoder network will be added to the model. This can improve image quality significantly. [False]")
 
 # For the Controller
 flags.DEFINE_float("target_starting_G_quality", 0.25, "Target quality of generator in the beginning of the training for the controller [0.25]")
@@ -80,7 +81,8 @@ def main(_):
           checkpoint_dir=checkpoint_dir,
           sample_dir=sample_dir,
 					log_dir=log_dir,
-          blur_strategy=FLAGS.blur_strategy)
+          blur_strategy=FLAGS.blur_strategy,
+          loose_encoder=FLAGS.with_loose_encoder)
     else:
       dcgan = DCGAN(
           sess,
@@ -96,7 +98,8 @@ def main(_):
           checkpoint_dir=checkpoint_dir,
           sample_dir=sample_dir,
 					log_dir=log_dir,
-          blur_strategy=FLAGS.blur_strategy)
+          blur_strategy=FLAGS.blur_strategy,
+          loose_encoder=FLAGS.with_loose_encoder)
 
     show_all_variables()
 

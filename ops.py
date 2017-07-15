@@ -54,15 +54,15 @@ def gauss_blur(img_batch,
   """
 
   if blur_strategy == "None":
-    return img_batch
-
-  output = tf.nn.depthwise_conv2d(img_batch, 
-                                      kernel, 
-                                      strides=[1,1,1,1], 
-                                      padding='SAME')
-  
-  output = tf.reshape(output, [batch_size, output_height, output_height, 3])
-  return output
+    return tf.reshape(img_batch, [batch_size, output_height, output_height, 3])
+  else:
+    output = tf.nn.depthwise_conv2d(img_batch, 
+                                        kernel, 
+                                        strides=[1,1,1,1], 
+                                        padding='SAME')
+    
+    output = tf.reshape(output, [batch_size, output_height, output_height, 3])
+    return output
 
 class batch_norm(object):
   def __init__(self, epsilon=1e-5, momentum = 0.9, name="batch_norm"):
