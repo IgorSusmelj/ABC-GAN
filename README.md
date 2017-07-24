@@ -198,7 +198,7 @@ We seem to reach the limit of DCGAN with this experiment. The same experiment wi
 
 ## Publications
 
-* ![ICML2017 Workshop on Implicit Generative Models](https://drive.google.com/open?id=0B3wEP_lEl0laVTdGcHE2VnRiMlE)
+* [ICML2017 Workshop on Implicit Generative Models](https://drive.google.com/open?id=0B3wEP_lEl0laVTdGcHE2VnRiMlE)
 
 ## Acknowledgement
 
