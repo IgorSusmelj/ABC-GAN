@@ -1,5 +1,11 @@
 # ABC-GAN
 
+The work represented in this repository is the result of a 14 week semesterthesis on photo-realistic image generation using generative adversarial networks at ETH zurich. 
+
+## Additional Experiments
+
+There is a second branch called `loose_encoder` in which you will find another experiment conducted during the thesis. Unfortunately we didn't had enough time to make an in-depth analysis of the results. The `loose encoder` can be added to any other experiment with a simple flag and in specific datasets such as CelebA results in astonishing improvement of generated image quality. To the best of our knowledge there is no GAN out there resulting in similar realistic images on celebA with a 64 by 64 output resolution. (Check the other branch for some samples)
+
 ## Prerequisites
 
 The code has been built and tested using the following packages (and versions)
@@ -100,11 +106,11 @@ The controller gives you the following benefits:
 
 **Controller architecture**:
 
-*Note: The Realism is calculated using the two losses of the discriminator (loss for real and for fake images).*
+*Note: The controller input is calculated using the two losses of the discriminator (loss for real and for fake images).*
 
 ![controller](report/controller.png)
 
-The controller tries to keep the avg. realism always at a reference point. The output of the controller is a probability of training either the discriminator or the generator.
+The controller tries to keep the avg. value always at a reference point. The output of the controller is a probability of training either the discriminator or the generator.
 
 ### Controllability
 
@@ -168,7 +174,7 @@ Combination of the Adaptive Blur and Controller GAN.
 
 We conducted different experiments using various datasets such as LSUN, CIFAR10 and CelebA. Some of the resulting images have been downscaled by a factor of two in order to reduce noise. *(Since on some screens and also printed the noise looks very annoying.)*
 
-***Note:*** *In some samples, you will see a green bar at the top. The bar is indicating the probability of the image coming from the real dataset rather than from the generator. We used the discriminator losses and a softmax to evaluate this probability.*
+***Note:*** *In some samples, you will see a green bar at the top. The bar is indicating the probability of the image coming from the real dataset rather than from the generator. We used the discriminator losses and a softmax to evaluate this probability and use it as an input for the controller.*
 
 ### LSUN bedrooms dataset
 
@@ -192,7 +198,7 @@ We seem to reach the limit of DCGAN with this experiment. The same experiment wi
 
 ## Publications
 
-*TODO*
+* ![ICML2017 Workshop on Implicit Generative Models](https://drive.google.com/open?id=0B3wEP_lEl0laVTdGcHE2VnRiMlE)
 
 ## Acknowledgement
 
