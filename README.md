@@ -94,9 +94,7 @@ In order to use LSUN just again change the `input_fname_pattern` and switch the 
 
 One of the most important points during training of GANs is balancing the discriminator against the generator. If one of the two dominates the other a mode collapse can occur. Many people started playing around with the ratio between discriminator and generator. And others used thresholds to determine if one has to train the discriminator or the generator. 
 
-In our work, we implemented a simple controller to get rid of this manual tuning. We end up controlling the probability of an image being real from the discriminator's point of view. Without a controller, this probability ends up being somewhere close to 0.5 since the discriminator has (once the network starts converging) a 50% chance of telling correctly if the samples he sees are coming from the real dataset or the generator. 
-
-The controller gives you the following benefits:
+In our work, we implemented a simple controller to get rid of this manual tuning. We end up controlling the probability of either training the discriminator or the generator for one iteration. The controller gives you the following benefits:
 
 * Reduced training time (up to a factor of 5)
 * Reuse the same network for different datasets (The controller automatically adapts to other datasets so you don't have to tune the ratio between D and G anymore)
@@ -111,19 +109,6 @@ The controller gives you the following benefits:
 ![controller](report/controller.png)
 
 The controller tries to keep the avg. value always at a reference point. The output of the controller is a probability of training either the discriminator or the generator.
-
-### Controllability
-
-**Plots showing average probability of a batch being classified as coming from the real dataset**
-
-*From the discriminators point of view*
-
-![probability of real image from discriminators point of view with controller](report/prob_of_real_image_with_controller.png)
-![probability of real image from discriminators point of view without controller](report/prob_of_real_image_without_controller.png)
-
-The left image shows the probability of being a real image using the controller. Right, the same experiment without the controller.
-
-What we essentially do using the controller is, we control how many samples coming from the generator should be classified by the discriminator as real. By chance, this value stays at around 0.5 since after convergence the discriminator has a 50% chance of correctly classifying an image as real or fake. The controller reduces this value *(in our case from 0.5 to around 0.25)* which makes sure that the discriminator always has a good chance to correctly classify the source of an image. Therefore, the discriminator always slightly dominates the generator. 
 
 ### Training behaviour
 
@@ -174,7 +159,7 @@ Combination of the Adaptive Blur and Controller GAN.
 
 We conducted different experiments using various datasets such as LSUN, CIFAR10 and CelebA. Some of the resulting images have been downscaled by a factor of two in order to reduce noise. *(Since on some screens and also printed the noise looks very annoying.)*
 
-***Note:*** *In some samples, you will see a green bar at the top. The bar is indicating the probability of the image coming from the real dataset rather than from the generator. We used the discriminator losses and a softmax to evaluate this probability and use it as an input for the controller.*
+***Note:*** *In some samples, you will see a green bar at the top. The bar is the actual input value of the controller on a per image basis. If the reference value is for example 0.25 (like in our code) this means that on average over one batch we want the green bar to be around 25%.*
 
 ### LSUN bedrooms dataset
 
@@ -198,7 +183,7 @@ We seem to reach the limit of DCGAN with this experiment. The same experiment wi
 
 ## Publications
 
-* ![ICML2017 Workshop on Implicit Generative Models](https://drive.google.com/open?id=0B3wEP_lEl0laVTdGcHE2VnRiMlE)
+* [ICML2017 Workshop on Implicit Generative Models](https://drive.google.com/open?id=0B3wEP_lEl0laVTdGcHE2VnRiMlE)
 
 ## Acknowledgement
 
