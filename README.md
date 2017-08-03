@@ -94,7 +94,7 @@ In order to use LSUN just again change the `input_fname_pattern` and switch the 
 
 One of the most important points during training of GANs is balancing the discriminator against the generator. If one of the two dominates the other a mode collapse can occur. Many people started playing around with the ratio between discriminator and generator. And others used thresholds to determine if one has to train the discriminator or the generator. 
 
-In our work, we implemented a simple controller to get rid of this manual tuning. We end up controlling the probability of either training the discriminator or the generator for one iteration. The controller gives you the following benefits:
+In our work, we implemented a simple controller to get rid of this manual tuning. The output of the controller is a probability of either training the discriminator or the generator for one iteration. The controller gives you the following benefits:
 
 * Reduced training time (up to a factor of 5)
 * Reuse the same network for different datasets (The controller automatically adapts to other datasets so you don't have to tune the ratio between D and G anymore)
