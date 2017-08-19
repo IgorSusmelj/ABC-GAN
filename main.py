@@ -30,12 +30,12 @@ flags.DEFINE_string("inference_z_src", "_", "Name of checkpoint file suffix to g
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
 flags.DEFINE_integer("GpD_ratio", -1, "Generator per discriminator training iteration steps. -1 uses the controller [-1]")
 flags.DEFINE_string("blur_strategy", "reg_hyp", "Blur strategy to use for training. [None, 3x3, reg_lin, reg_hyp]")
-flags.DEFINE_boolean("with_overlay", False, "If True, an overlay indicating the realism from the discriminators point of view will be added to all images in a batch. Additionally each batch will be sorted using this realism. Most realistic image on bottom right. [False]")
+flags.DEFINE_boolean("with_overlay", False, "If True, an overlay indicating the calculated value of the controller will be added to all images in a batch. Additionally each batch will be sorted using this value. [False]")
 flags.DEFINE_integer("sample_every", 1000, "Sample a new image all x iterations during training. [1000]")
 
 # For the Controller
-flags.DEFINE_float("target_starting_G_quality", 0.25, "Target quality of generator in the beginning of the training for the controller [0.25]")
-flags.DEFINE_float("target_ending_G_quality", 0.25, "Target quality of generator in the end of the training for the controller [0.25]")
+flags.DEFINE_float("target_starting_G_quality", 0.25, "Target loss ratio of generator in the beginning of the training for the controller [0.25]")
+flags.DEFINE_float("target_ending_G_quality", 0.25, "Target loss ratio of generator in the end of the training for the controller [0.25]")
 flags.DEFINE_float("control_gain", 0.001, "Gain of the controller [0.001]")
 
 FLAGS = flags.FLAGS

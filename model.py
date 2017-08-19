@@ -125,7 +125,7 @@ class DCGAN(object):
       self.D_, self.D_logits_ = \
           self.discriminator(gauss_blur(self.G, self.batch_size, kernel=self.gauss_kernel, output_height=self.output_height, blur_strategy=self.blur_strategy), self.y, reuse=True)
       self.R, self.R_logits = \
-          self.realisticness_estimator(gauss_blur(self.G, self.batch_size, kernel=self.gauss_kernel, output_height=self.output_height, blur_strategy=self.blur_strategy), self.y, reuse=True)
+          self.discriminator_inference(gauss_blur(self.G, self.batch_size, kernel=self.gauss_kernel, output_height=self.output_height, blur_strategy=self.blur_strategy), self.y, reuse=True)
     else:
       self.G = self.generator(self.z)
       self.D, self.D_logits = self.discriminator(gauss_blur(inputs, 
@@ -141,7 +141,7 @@ class DCGAN(object):
                                                               output_height=self.output_height, 
                                                               blur_strategy=self.blur_strategy), 
                                                               reuse=True)
-      self.R, self.R_logits = self.realisticness_estimator(gauss_blur(self.G, 
+      self.R, self.R_logits = self.discriminator_inference(gauss_blur(self.G, 
                                                                       self.batch_size, 
                                                                       kernel=self.gauss_kernel, 
                                                                       output_height=self.output_height, 
@@ -321,6 +321,8 @@ class DCGAN(object):
         # evaluate generator to discriminator ratio
         # here we compute some intermediate results
         self.target_G_quality = self.target_starting_G_quality + (self.target_ending_G_quality-self.target_starting_G_quality)*(epoch/config.epoch)
+        
+        # we also experimented with parameterizing the reference value using a sine curve.
         #self.target_G_quality += 0.2 * np.sin(counter/500.0)
         
         # for sampling generated images from z space using sampler
@@ -555,7 +557,7 @@ class DCGAN(object):
         
         return tf.nn.sigmoid(h3), h3
 
-  def realisticness_estimator(self, image, y=None, reuse=True):
+  def discriminator_inference(self, image, y=None, reuse=True):
     with tf.variable_scope("discriminator") as scope:
       scope.reuse_variables()
 
